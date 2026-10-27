@@ -189,7 +189,7 @@ jobs:
   build:
     name: Build
     needs: [check_certs, check_status]
-    runs-on: macos-26
+    runs-on: xcode-27
     permissions:
       contents: write
     if:
@@ -199,7 +199,20 @@ jobs:
         (vars.SCHEDULED_SYNC != 'false' && needs.check_status.outputs.NEW_COMMITS == 'true' )
     steps:
       - name: Select Xcode version
-        run: "sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer"
+        run: |
+          # Prefer Xcode 26.5 if the runner has it, otherwise the newest released Xcode 27 (never a beta)
+          if [ -d /Applications/Xcode_26.5.app ]; then
+            XCODE=/Applications/Xcode_26.5.app
+          else
+            XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          fi
+          if [ -z "$XCODE" ]; then
+            echo "::error::No suitable Xcode found. Installed versions:"
+            ls /Applications | grep -i xcode
+            exit 1
+          fi
+          sudo xcode-select --switch "$XCODE/Contents/Developer"
+          xcodebuild -version
       
       - name: Checkout Repo for building
         uses: actions/checkout@v5
